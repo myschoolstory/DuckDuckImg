@@ -1,0 +1,2 @@
+gradio
+duckduckgo_search
