@@ -49,11 +49,14 @@ def scrape_and_zip(search_term: str, max_images: int):
             try:
                 response = requests.get(url, stream=True, timeout=5)
                 response.raise_for_status()
-                # Get the file extension or default to .jpg
-                file_extension = os.path.splitext(url)[1] or '.jpg'
-                if '?' in file_extension: # Clean up extensions with query params
-                    file_extension = file_extension.split('?')[0]
-                
+                # Custom logic for .jpg&fm=jpg
+                if url.endswith('.jpg&fm=jpg'):
+                    file_extension = '.jpg'
+                else:
+                    file_extension = os.path.splitext(url)[1] or '.jpg'
+                    if '?' in file_extension: # Clean up extensions with query params
+                        file_extension = file_extension.split('?')[0]
+
                 file_path = os.path.join(temp_dir, f"image_{i}{file_extension}")
 
                 with open(file_path, 'wb') as f:
