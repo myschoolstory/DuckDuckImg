@@ -1,2 +1,4 @@
 gradio
 duckduckgo_search
+Pillow
+tqdm

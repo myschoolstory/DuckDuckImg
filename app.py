@@ -5,6 +5,8 @@ import zipfile
 import shutil
 import uuid
 import requests
+from PIL import Image
+from tqdm import tqdm
 
 def scrape_and_zip(search_term: str, max_images: int):
     """
@@ -44,8 +46,8 @@ def scrape_and_zip(search_term: str, max_images: int):
             for r in results:
                 image_urls.append(r['image'])
 
-        # Download the images from the URLs
-        for i, url in enumerate(image_urls):
+        print("Downloading and converting images...")
+        for i, url in enumerate(tqdm(image_urls, desc="Images", unit="img")):
             try:
                 response = requests.get(url, stream=True, timeout=5)
                 response.raise_for_status()
@@ -54,13 +56,24 @@ def scrape_and_zip(search_term: str, max_images: int):
                     file_extension = '.jpg'
                 else:
                     file_extension = os.path.splitext(url)[1] or '.jpg'
-                    if '?' in file_extension: # Clean up extensions with query params
+                    if '?' in file_extension:
                         file_extension = file_extension.split('?')[0]
 
                 file_path = os.path.join(temp_dir, f"image_{i}{file_extension}")
 
                 with open(file_path, 'wb') as f:
                     shutil.copyfileobj(response.raw, f)
+
+                # Convert to .jpg if not already .jpg
+                if file_extension.lower() != '.jpg':
+                    try:
+                        img = Image.open(file_path)
+                        rgb_img = img.convert('RGB')
+                        jpg_path = os.path.join(temp_dir, f"image_{i}.jpg")
+                        rgb_img.save(jpg_path, 'JPEG')
+                        os.remove(file_path)
+                    except Exception as img_e:
+                        print(f"Could not convert {file_path} to .jpg: {img_e}")
             except Exception as e:
                 print(f"Could not download image {url}: {e}")
 
@@ -74,10 +87,13 @@ def scrape_and_zip(search_term: str, max_images: int):
         # Create a zip file
         zip_path = f"{search_term.replace(' ', '_')}_images.zip"
         print(f"Creating zip file at '{zip_path}'...")
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, _, files in os.walk(temp_dir):
-                for file in files:
-                    file_path = os.path.join(root, file)
+        all_files = []
+        for root, _, files in os.walk(temp_dir):
+            for file in files:
+                all_files.append(os.path.join(root, file))
+        for _ in tqdm(range(1), desc="Zipping", unit="zip"):
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file_path in tqdm(all_files, desc="Adding to zip", unit="file"):
                     zipf.write(file_path, os.path.relpath(file_path, temp_dir))
 
         # Clean up the temporary directory
